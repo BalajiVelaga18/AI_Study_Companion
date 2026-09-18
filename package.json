@@ -1,0 +1,12 @@
+{
+  "name": "ai-study-companion",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["server", "client"],
+  "scripts": {
+    "dev:server": "npm --workspace server run dev",
+    "dev:client": "npm --workspace client run dev",
+    "test": "npm --workspace server run test",
+    "build": "npm --workspace client run build"
+  }
+}

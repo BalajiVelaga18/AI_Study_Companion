@@ -61,6 +61,6 @@ connectDB(process.env.MONGO_URI).then((conn) => {
   if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'dev-secret-change-me') {
     console.warn('warn: JWT_SECRET is the default dev value — set your own in .env');
   }
-  if (require.main === module) app.listen(PORT, () => console.log(`server :${PORT}`));
+  if (require.main === module) app.listen(PORT, '0.0.0.0', () => console.log(`server :${PORT}`));;
 }).catch((e) => { console.error('db connect failed — check MONGO_URI in .env:', e.message); process.exit(1); });
 module.exports = app;

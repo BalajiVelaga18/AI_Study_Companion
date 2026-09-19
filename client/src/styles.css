@@ -453,3 +453,141 @@ input, textarea, select { width: 100%; border: 1px solid var(--line); border-rad
   .admin-tabs button { padding: 7px 12px; font-size: .8rem; }
   .admin-section { padding: 16px; }
 }
+
+/* Form messages */
+.form-error {
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  border-radius: 7px;
+  background: rgba(236, 118, 93, 0.12);
+  color: #a84a35;
+  font-size: .9rem;
+}
+
+.btn-secondary {
+  color: var(--pine);
+  background: #d8e8d9;
+}
+
+/* Quiz */
+.quiz-card {
+  max-width: 720px;
+}
+
+.quiz-progress {
+  height: 8px;
+  margin-bottom: 10px;
+  border-radius: 20px;
+  background: #e1e8df;
+  overflow: hidden;
+}
+
+.quiz-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #73af94, #e5a35f);
+  transition: width .3s ease;
+}
+
+.quiz-meta {
+  font-size: .8rem;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+
+.quiz-prompt {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.quiz-concept {
+  font-size: .8rem;
+  color: var(--muted);
+  margin-bottom: 18px;
+}
+
+.quiz-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.quiz-option {
+  text-align: left;
+  background: rgba(255, 255, 255, .6);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.quiz-option:hover:not(:disabled) {
+  background: rgba(27, 117, 102, .08);
+}
+
+.quiz-open textarea {
+  margin-bottom: 10px;
+}
+
+.quiz-feedback {
+  margin-top: 18px;
+  padding: 14px;
+  border-radius: 10px;
+}
+
+.quiz-feedback.correct {
+  background: rgba(39, 128, 107, .1);
+  border: 1px solid rgba(39, 128, 107, .3);
+}
+
+.quiz-feedback.wrong {
+  background: rgba(236, 118, 93, .1);
+  border: 1px solid rgba(236, 118, 93, .3);
+}
+
+.quiz-result {
+  text-align: center;
+}
+
+.quiz-score {
+  font-family: 'Playfair Display', serif;
+  font-size: 3.5rem;
+  line-height: 1;
+  color: var(--pine);
+  margin: 12px 0;
+}
+
+.quiz-review {
+  text-align: left;
+  margin-top: 24px;
+}
+
+.review-item {
+  padding: 14px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+}
+
+.review-item.correct {
+  background: rgba(39, 128, 107, .06);
+}
+
+.review-item.wrong {
+  background: rgba(236, 118, 93, .06);
+}
+
+.review-q {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.review-a {
+  font-size: .9rem;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.review-feedback {
+  font-size: .85rem;
+  color: var(--muted);
+}

@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
 
-// /spaces and /spaces/:spaceId — thin views over the same Space/Project APIs.
 export default function Spaces({ detail }) {
   const { spaceId } = useParams();
   const [spaces, setSpaces] = useState([]);

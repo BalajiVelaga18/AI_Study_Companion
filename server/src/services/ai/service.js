@@ -78,6 +78,21 @@ function dedupeCitations(cites) {
   return out;
 }
 
+async function runRetrieval({ projectId, pageRef, question, chunks }) {
+  if (projectId) {
+    if (pageRef) return retrievalService.searchByPage({ projectId, page: pageRef, question });
+    return retrievalService.search({ projectId, question, k: 4 });
+  }
+  const list = Array.isArray(chunks) ? chunks : [];
+  let queryEmbedding = null;
+  try {
+    const emb = require('./embedding');
+    if (emb.isEnabled()) queryEmbedding = await emb.generateEmbedding(question);
+  } catch { queryEmbedding = null; }
+  const hits = retrieve(question, list, 4, queryEmbedding);
+  return { method: 'tfidf', hits, chunks: list, fallbackUsed: false, fallbackReason: null };
+}
+
 // ---- Tutor: retrieval is shared; citations always come from DB chunk metadata ----
 async function tutorResponse({ question, projectId, chunks, context = {} }) {
   if (typeof question !== 'string' || !question.trim()) throw new Error('question is required');
@@ -91,22 +106,20 @@ async function tutorResponse({ question, projectId, chunks, context = {} }) {
 
   // Retrieve relevant chunks. Production uses retrievalService (vector or TF-IDF);
   // the legacy `chunks` argument is kept for existing tests.
-  let retrievalResult;
-  if (projectId) {
-    if (pageRef) {
-      retrievalResult = await retrievalService.searchByPage({ projectId, page: pageRef, question });
-    } else {
-      retrievalResult = await retrievalService.search({ projectId, question, k: 4 });
+  let retrievalResult = await runRetrieval({ projectId, pageRef, question, chunks });
+  let effectiveQuestion = question;
+
+  // Broad intents like "Explain this simply" or "Give me an example" often don't
+  // contain topic keywords. If the plain query fails the evidence bar, try once
+  // more with the project goal prepended so the tutor stays grounded in the material.
+  const broadIntents = new Set(['simplify', 'example', 'revise', 'ask']);
+  if (!pageRef && !retrievalService.meetsEvidenceBar(question, retrievalResult) && broadIntents.has(intent) && goal) {
+    const expanded = `${goal} ${question}`;
+    const expandedResult = await runRetrieval({ projectId, question: expanded, chunks });
+    if (retrievalService.meetsEvidenceBar(expanded, expandedResult)) {
+      retrievalResult = expandedResult;
+      effectiveQuestion = expanded;
     }
-  } else {
-    const list = Array.isArray(chunks) ? chunks : [];
-    let queryEmbedding = null;
-    try {
-      const emb = require('./embedding');
-      if (emb.isEnabled()) queryEmbedding = await emb.generateEmbedding(question);
-    } catch { queryEmbedding = null; }
-    const hits = retrieve(question, list, 4, queryEmbedding);
-    retrievalResult = { method: 'tfidf', hits, chunks: list, fallbackUsed: false, fallbackReason: null };
   }
 
   const hits = retrievalResult.hits;
@@ -122,7 +135,7 @@ async function tutorResponse({ question, projectId, chunks, context = {} }) {
   }
 
   // Evidence gate. Vector mode uses vector scores; TF-IDF mode uses lexical overlap.
-  if (!retrievalService.meetsEvidenceBar(question, retrievalResult)) {
+  if (!retrievalService.meetsEvidenceBar(effectiveQuestion, retrievalResult)) {
     if (aiConfig().primary === 'mock') {
       return { answer: unsupportedMessage(goal), citations: [], grounded: false, provider: 'mock', fallbackUsed: false, model: mockProvider.MODEL, latencyMs: 0, intent };
     }
@@ -139,13 +152,14 @@ async function tutorResponse({ question, projectId, chunks, context = {} }) {
     intent,
     snapshotText: snapshotText(context.snapshot),
   };
+  const groundedQuestion = effectiveQuestion;
 
   // Provider calls use `hits` directly. Mock provider is updated to accept hits
   // when available, falling back to its legacy chunks interface for old callers.
   if (aiConfig().primary === 'mock') {
     return runFeature('tutor', {
       fallback: async () => {
-        const r = await mockProvider.generateTutorResponse({ question, hits, chunks: retrievalResult.chunks, context: richContext });
+        const r = await mockProvider.generateTutorResponse({ question: groundedQuestion, hits, chunks: retrievalResult.chunks, context: richContext });
         return { ...r, citations: dedupeCitations(r.citations), intent };
       },
     });
@@ -153,7 +167,7 @@ async function tutorResponse({ question, projectId, chunks, context = {} }) {
   return runFeature('tutor', {
     primary: async () => {
       const g = await geminiProvider.generateTutorResponse({
-        question,
+        question: groundedQuestion,
         hits,
         context: {
           goal,
@@ -182,7 +196,7 @@ async function tutorResponse({ question, projectId, chunks, context = {} }) {
       };
     },
     fallback: async () => {
-      const r = await mockProvider.generateTutorResponse({ question, hits, chunks: retrievalResult.chunks, context: richContext });
+      const r = await mockProvider.generateTutorResponse({ question: groundedQuestion, hits, chunks: retrievalResult.chunks, context: richContext });
       return { ...r, citations: dedupeCitations(r.citations), intent };
     },
   });

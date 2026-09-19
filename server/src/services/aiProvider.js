@@ -24,8 +24,6 @@ function formatMockAnswer({ question, hits, context }) {
   const goal = sanitize(context?.goal || '');
   const weak = (context?.weaknesses || []).slice(0, 3);
   const qterms = new Set(tokens(question));
-  // Only use hits that are reasonably close to the best score; drops
-  // marginally-related chunks that happen to share a generic term.
   const bestScore = hits[0]?.score || 0;
   const relevant = hits.filter((h) => h.score >= bestScore * 0.5).slice(0, 2);
   const top = relevant.length ? relevant : hits.slice(0, 1);
@@ -37,10 +35,11 @@ function formatMockAnswer({ question, hits, context }) {
   else if (intent === 'example') intro = 'Here is an example';
   else if (intent === 'revise') intro = 'Quick review';
 
+  const body = points.join(' ');
   const lines = [];
   lines.push(`${intro}${goal ? ` for “${goal}”` : ''}:`);
   lines.push('');
-  for (const p of points) lines.push(`- ${p}`);
+  lines.push(body);
   if (intent === 'revise' && weak.length) {
     lines.push('');
     lines.push(`Focus areas: ${weak.join(', ')}.`);

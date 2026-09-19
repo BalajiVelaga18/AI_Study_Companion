@@ -8,5 +8,8 @@
     "dev:client": "npm --workspace client run dev",
     "test": "npm --workspace server run test",
     "build": "npm --workspace client run build"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

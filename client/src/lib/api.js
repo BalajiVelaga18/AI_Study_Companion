@@ -1,4 +1,6 @@
-export const API = 'http://localhost:4000';
+// Vite injects env vars prefixed with VITE_ at build time.
+// Set VITE_API_URL on Vercel (or your build host) to point at the Render backend.
+export const API = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 export function authHeaders() { return { Authorization: `Bearer ${localStorage.getItem('token') || ''}` }; }
 
 function errorMessage(data) {

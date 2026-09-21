@@ -1,4 +1,4 @@
-// Local TF-IDF retrieval over project chunks. No external keys needed.
+// Local TF-IDF retrieval over project chunks. Fallback when Atlas Vector Search is unavailable.
 // Stopwords are excluded so a lone "the"/"what" can never count as evidence.
 const STOP = new Set('a,an,the,and,or,but,if,then,else,for,to,of,in,on,at,by,with,from,as,is,are,was,were,be,been,am,what,which,who,whom,whose,when,where,why,how,that,this,these,those,there,their,them,they,you,your,all,any,can,had,has,have,had,not,one,our,out,more,very,should,could,would,also,each,make,made,such,only,like,using,used,use,into,over,after,before,between,under,about,than,its,itself,just,than,too,very,will,shall,may,might,must,do,does,did,done,than,won,let,per,via'.split(','));
 function tokens(s) { return (s.toLowerCase().match(/[a-z0-9]{3,}/g) || []).filter((t) => !STOP.has(t)); }

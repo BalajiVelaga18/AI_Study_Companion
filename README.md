@@ -5,8 +5,8 @@ Full learning loop: Space → Project → PDF Material → Background processing
 ## Stack
 - Backend: Node.js + Express + Mongoose (MongoDB)
 - Frontend: React (Vite) + React Router
-- AI: Local/Mock provider abstraction (`server/src/services/aiProvider.js`) — grounded TF-IDF retrieval, no external keys needed. Swap to OpenAI/Gemini by implementing `generate()` + `generateStructured()`.
-- PDF: `pdf-parse` + chunking + TF-IDF retrieval with page citations
+- AI: Local/Mock provider abstraction (`server/src/services/aiProvider.js`) — grounded retrieval, no external keys needed. Swap to OpenAI/Gemini by implementing `generate()` + `generateStructured()`.
+- PDF: `pdf-parse` + chunking + semantic/vector retrieval with page citations (TF-IDF fallback)
 - Jobs: in-process async queue with states queued/processing/done/failed, retries ×3, idempotency keys
 - Auth: JWT + bcrypt, `user` / `admin` roles, project-level isolation enforced in middleware (`projectScope`)
 
@@ -57,7 +57,7 @@ Tutor/Quiz/Assessment route → aiService → primary provider → response
 
 - **Mock provider** (`services/ai/providers/mock.provider.js`) — thin adapter over the original `services/aiProvider.js`, which is **unchanged**. Deterministic, offline, used for dev/tests.
 - **Gemini provider** (`services/ai/providers/gemini.provider.js`) — the only file importing `@google/generative-ai`. JSON-mode structured outputs validated with zod before anything touches MongoDB; citations are mapped from retrieved-chunk metadata, never from model text. No-evidence questions short-circuit to the standard unsupported message without an LLM call.
-- **Embeddings** (`services/ai/embedding.js`) — separate abstraction (`AI_EMBEDDINGS=auto|gemini|mock|off`; auto = real Gemini embeddings only when `AI_PROVIDER=gemini`, otherwise off so mock mode is pure TF-IDF). Retrieval blends cosine in only when embeddings exist on both sides.
+- **Embeddings** (`services/ai/embedding.js`) — separate abstraction (`AI_EMBEDDINGS=auto|gemini|mock|off`; auto = real Gemini embeddings when `AI_PROVIDER=gemini`, otherwise off so mock mode falls back to TF-IDF). Used by Atlas Vector Search for semantic retrieval.
 - **Fallback rules** (`services/ai/errors.js`): quota/rate-limit/auth/timeout/network/server errors → Mock; programming errors (bad args, DB, authz) → real errors, never hidden. One retry for transient faults only, never for quota. Timeout via `AI_TIMEOUT_MS`.
 - **Honesty**: every response carries `provider` + `fallbackUsed`; the Tutor UI shows a subtle "Fallback demo response" badge; Admin → AI usage shows `prov=` / `fallback` / `err=` per call. Nothing claims Gemini when Mock answered.
 - **Failure demo**: `AI_PROVIDER=gemini AI_FALLBACK_PROVIDER=mock GEMINI_SIMULATE_FAILURE=true [GEMINI_SIMULATE_ERROR=quota_exceeded]` — full loop keeps working on Mock. All simulation is dev-only, default off.
@@ -65,10 +65,10 @@ Tutor/Quiz/Assessment route → aiService → primary provider → response
 
 ## Retrieval modes
 
-The Tutor supports two retrieval backends, selected via `RETRIEVAL_MODE`:
+The Tutor uses Atlas Vector Search by default, with TF-IDF as a fallback:
 
-- **`tfidf`** (default) — local TF-IDF over project chunks. No Atlas required.
-- **`vector`** — semantic retrieval with MongoDB Atlas Vector Search over `Chunk.embedding` (768-dim vectors from `gemini-embedding-2`), filtered by `projectId`. Falls back to TF-IDF if Atlas/index/embedding is unavailable.
+- **`vector`** (default) — semantic retrieval with MongoDB Atlas Vector Search over `Chunk.embedding` (768-dim vectors from `gemini-embedding-2`), filtered by `projectId`. Falls back to TF-IDF if Atlas/index/embedding is unavailable.
+- **`tfidf`** — local keyword matching over project chunks. No Atlas required.
 
 New PDFs automatically get embeddings for all chunks. Existing chunks can be backfilled:
 

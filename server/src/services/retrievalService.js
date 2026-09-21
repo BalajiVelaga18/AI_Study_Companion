@@ -2,14 +2,14 @@
 // The Tutor calls this service rather than depending on MongoDB/TF-IDF details.
 //
 // Configuration:
-//   RETRIEVAL_MODE=vector  → primary vector search, optional TF-IDF fallback
-//   RETRIEVAL_MODE=tfidf   → pure TF-IDF (default, preserves existing behavior)
+//   RETRIEVAL_MODE=vector  → primary vector search, optional TF-IDF fallback (default)
+//   RETRIEVAL_MODE=tfidf   → pure TF-IDF
 const { Chunk } = require('../models');
 const tfidf = require('./retrieval');
 const vector = require('./vectorRetrieval');
 
 function retrievalMode(explicitMode) {
-  return String(explicitMode || process.env.RETRIEVAL_MODE || 'tfidf').toLowerCase();
+  return String(explicitMode || process.env.RETRIEVAL_MODE || 'vector').toLowerCase();
 }
 
 async function maybeGenerateQueryEmbedding(question) {

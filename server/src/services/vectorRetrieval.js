@@ -1,4 +1,4 @@
-// MongoDB Atlas Vector Search retrieval.
+// MongoDB Atlas Vector Search retrieval — default retrieval backend.
 //
 // Requirements:
 //   - MongoDB Atlas cluster (M10+/serverless) with a Vector Search index on Chunk.embedding
@@ -28,7 +28,7 @@ function toObjectId(id) {
 }
 
 function isVectorMode() {
-  return String(process.env.RETRIEVAL_MODE || 'tfidf').toLowerCase() === 'vector';
+  return String(process.env.RETRIEVAL_MODE || 'vector').toLowerCase() === 'vector';
 }
 
 function isConfigured() {
@@ -139,17 +139,19 @@ function meetsEvidenceBar(question, hits) {
 }
 
 // Best-effort probe: try a tiny $vectorSearch to see if the index is usable.
+// Uses a non-zero query vector because cosine similarity is undefined against zero.
 async function isAvailable() {
   if (!isConfigured()) return false;
   const expectedDim = embedding.expectedDimension();
   const dim = expectedDim || 768;
+  const v = new Array(dim).fill(1 / Math.sqrt(dim));
   try {
     await Chunk.aggregate([
       {
         $vectorSearch: {
           index: VECTOR_INDEX_NAME,
           path: 'embedding',
-          queryVector: new Array(dim).fill(0),
+          queryVector: v,
           numCandidates: 1,
           limit: 1,
         },

@@ -5,7 +5,7 @@ const { tokens } = require('./retrieval');
 const aiService = require('./ai/service');
 
 function retrievalMode() {
-  return String(process.env.RETRIEVAL_MODE || 'tfidf').toLowerCase();
+  return String(process.env.RETRIEVAL_MODE || 'vector').toLowerCase();
 }
 
 // In-process background queue: queued → processing → ready/failed, retries, idempotency.

@@ -1,6 +1,6 @@
 # Known Limitations
 
-- **Retrieval**: TF-IDF keyword overlap, no semantic vectors; paraphrased questions may miss. → Atlas Vector Search.
+- **Retrieval**: Atlas Vector Search is the default, which handles paraphrases better than the legacy TF-IDF fallback. TF-IDF is still used for page-aware queries and when vector search is unavailable.
 - **PDF parsing**: `pdf-parse` text-only; scanned/image PDFs yield little text (no OCR); tables/diagrams lost.
 - **AI quality**: mock-local heuristics, not a real LLM — answers summarize chunks; no deep reasoning. Swap provider for quality.
 - **Gemini mode**: needs `GEMINI_API_KEY` + network; quota/rate limits fall back to Mock (logged with category). Token/cost columns are heuristic estimates, not billing data.

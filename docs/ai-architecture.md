@@ -8,8 +8,8 @@ Routes call `aiService.tutorResponse / generateQuiz / evaluateAssessment / extra
 
 ## Retrieval (`services/retrievalService.js`)
 The Tutor uses a retrieval abstraction so it does not depend on MongoDB/TF-IDF internals:
-- `RETRIEVAL_MODE=tfidf` (default): loads project chunks and scores them with the existing TF-IDF implementation (`services/retrieval.js`).
-- `RETRIEVAL_MODE=vector`: generates a query embedding and runs MongoDB Atlas `$vectorSearch` over the `Chunk.embedding` field, filtered by `projectId`. If Atlas/index/embedding is unavailable, it falls back to TF-IDF and records `retrievalMethod: 'tfidf'` + `fallbackUsed: true`.
+- `RETRIEVAL_MODE=vector` (default): generates a query embedding and runs MongoDB Atlas `$vectorSearch` over the `Chunk.embedding` field, filtered by `projectId`. If Atlas/index/embedding is unavailable, it falls back to TF-IDF and records `retrievalMethod: 'tfidf'` + `retrievalFallbackUsed: true`.
+- `RETRIEVAL_MODE=tfidf`: loads project chunks and scores them with the existing TF-IDF implementation (`services/retrieval.js`).
 - Page-aware queries always use TF-IDF on the requested page.
 
 ### Atlas Vector Search index
@@ -22,7 +22,7 @@ Create this index in MongoDB Atlas for the configured `gemini-embedding-2` model
   ]
 }
 ```
-Name it `chunk_vector_index` (or set `VECTOR_SEARCH_INDEX`). The index must exist before `RETRIEVAL_MODE=vector` can return vector results; otherwise the service falls back to TF-IDF.
+Name it `chunk_vector_index` (or set `VECTOR_SEARCH_INDEX`). The index must exist before `RETRIEVAL_MODE=vector` can return vector results; otherwise the service falls back to TF-IDF. With `RETRIEVAL_MODE=vector` as the default, creating this index is required for semantic search.
 
 ### Embeddings
 `services/ai/embedding.js` exposes `generateEmbedding(text)` and `generateEmbeddings(texts[])`. New PDF chunks are embedded in batches during material processing (`services/jobs.js`). Existing chunks without embeddings can be backfilled:
@@ -31,9 +31,16 @@ AI_EMBEDDINGS=gemini RETRIEVAL_MODE=vector npm --workspace server run backfill:e
 ```
 
 ## RAG flow
-1. Question → `retrieve()` scores **only this project's chunks** (TF-IDF over `tokens`, top-4; cosine blended in only when both sides have embeddings).
+1. Question → `retrievalService.search()` generates a query embedding and scores **only this project's chunks** via Atlas Vector Search (top-4). If vector search is unavailable, it falls back to TF-IDF over `tokens`.
 2. Evidence gate (`meetsEvidenceBar`) fails → **unsupported path** without any LLM call: explicit "not enough evidence" message naming the learning goal. Never fabricate citations.
 3. Else (Gemini mode) → model answers from labeled-untrusted documents and returns supporting doc indices, which the service maps to real chunk metadata (`[{materialId, filename, page}]`, invalid indices dropped). (Mock mode summarizes the same hits directly.)
+
+## Observability
+Every tutor response exposes the retrieval backend that was used:
+- **Server logs:** `[AI] retrieval method=vector hits=...` or `[AI] retrieval method=tfidf hits=...`. A fallback logs `[retrieval] vector search unavailable, falling back to tfidf: ...`.
+- **API response:** `POST /api/learn/:projectId/tutor` now returns `retrievalMethod` (`vector` | `tfidf`), `retrievalFallbackUsed` (boolean), and `retrievalFallbackReason` (string | null).
+- **Stored message:** each assistant `Message` document records `retrievalMethod`, `retrievalFallbackUsed`, and `retrievalFallbackReason` for history.
+- **AI usage:** `AIUsage` documents record `retrievalMethod` and `retrievalFallbackUsed` for admin analytics.
 
 
 ## Context assembly (no full-history dump)

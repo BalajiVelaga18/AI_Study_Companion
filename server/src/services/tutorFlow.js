@@ -41,11 +41,14 @@ async function answerTutorQuestion({ ownerId, project, question, conversationId 
     ownerId, projectId: project._id, conversationId: conv._id, role: 'assistant',
     text: out.answer, citations: out.citations, provider: out.provider,
     fallbackUsed: out.fallbackUsed, basis: out.basis,
+    retrievalMethod: out.retrievalMethod,
+    retrievalFallbackUsed: out.retrievalFallbackUsed,
+    retrievalFallbackReason: out.retrievalFallbackReason,
   });
   conv.messageCount = (conv.messageCount || 0) + 2;
   conv.updatedAt = new Date();
   await conv.save();
-  await Event.create({ ownerId, projectId: project._id, type: 'tutor.ask', data: { grounded: out.grounded, provider: out.provider, fallbackUsed: out.fallbackUsed, conversationId: conv._id } });
+  await Event.create({ ownerId, projectId: project._id, type: 'tutor.ask', data: { grounded: out.grounded, provider: out.provider, fallbackUsed: out.fallbackUsed, retrievalMethod: out.retrievalMethod, retrievalFallbackUsed: out.retrievalFallbackUsed, conversationId: conv._id } });
   await logAI({
     ownerId, projectId: project._id, feature: 'tutor',
     provider: out.provider, fallbackUsed: out.fallbackUsed, fallbackProvider: out.fallbackUsed ? 'mock' : undefined,
@@ -53,6 +56,8 @@ async function answerTutorQuestion({ ownerId, project, question, conversationId 
     inputTokens: out.inputTokens || 0, outputTokens: out.outputTokens || 0,
     tokens: (out.inputTokens || 0) + (out.outputTokens || 0) || (((q.length + String(out.answer || '').length) / 4) | 0),
     ok: true,
+    retrievalMethod: out.retrievalMethod,
+    retrievalFallbackUsed: out.retrievalFallbackUsed,
   });
   // Rolling memory update — never blocks the reply.
   updateConversationSummary(conv._id, aiService.aiConfig().primary === 'gemini');

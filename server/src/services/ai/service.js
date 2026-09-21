@@ -125,24 +125,31 @@ async function tutorResponse({ question, projectId, chunks, context = {} }) {
   const hits = retrievalResult.hits;
   log(`retrieval method=${retrievalResult.method}${retrievalResult.fallbackUsed ? ' (tfidf fallback)' : ''} hits=${hits.map((h) => `${+h.score.toFixed(2)}/p${h.chunk.page}`).join(',') || 'none'} intent=${intent}`);
 
+  const retrievalMeta = {
+    retrievalMethod: retrievalResult.method,
+    retrievalFallbackUsed: retrievalResult.fallbackUsed || false,
+    retrievalFallbackReason: retrievalResult.fallbackReason || null,
+  };
+
   // Page-aware: explicit page reference with no matching chunks → immediate unsupported.
   if (pageRef && !hits.length) {
     const msg = `I don't have any content from page ${pageRef} in your project materials. Upload relevant material or rephrase within the scope of: ${goal || 'this project'}.`;
     if (aiConfig().primary === 'mock') {
-      return { answer: msg, citations: [], grounded: false, provider: 'mock', fallbackUsed: false, fallbackReason: 'no_evidence', model: mockProvider.MODEL, latencyMs: 0, intent: 'page' };
+      return { answer: msg, citations: [], grounded: false, provider: 'mock', fallbackUsed: false, fallbackReason: 'no_evidence', model: mockProvider.MODEL, latencyMs: 0, intent: 'page', ...retrievalMeta };
     }
-    return { answer: msg, citations: [], grounded: false, provider: 'mock', fallbackUsed: true, fallbackReason: 'no_evidence', model: mockProvider.MODEL, latencyMs: 0, intent: 'page' };
+    return { answer: msg, citations: [], grounded: false, provider: 'mock', fallbackUsed: true, fallbackReason: 'no_evidence', model: mockProvider.MODEL, latencyMs: 0, intent: 'page', ...retrievalMeta };
   }
 
   // Evidence gate. Vector mode uses vector scores; TF-IDF mode uses lexical overlap.
   if (!retrievalService.meetsEvidenceBar(effectiveQuestion, retrievalResult)) {
     if (aiConfig().primary === 'mock') {
-      return { answer: unsupportedMessage(goal), citations: [], grounded: false, provider: 'mock', fallbackUsed: false, model: mockProvider.MODEL, latencyMs: 0, intent };
+      return { answer: unsupportedMessage(goal), citations: [], grounded: false, provider: 'mock', fallbackUsed: false, model: mockProvider.MODEL, latencyMs: 0, intent, ...retrievalMeta };
     }
     return {
       answer: unsupportedMessage(goal), citations: [], grounded: false,
       provider: 'mock', fallbackUsed: true, fallbackReason: 'no_evidence',
       model: mockProvider.MODEL, latencyMs: 0, intent,
+      ...retrievalMeta,
     };
   }
 
@@ -160,7 +167,7 @@ async function tutorResponse({ question, projectId, chunks, context = {} }) {
     return runFeature('tutor', {
       fallback: async () => {
         const r = await mockProvider.generateTutorResponse({ question: groundedQuestion, hits, chunks: retrievalResult.chunks, context: richContext });
-        return { ...r, citations: dedupeCitations(r.citations), intent };
+        return { ...r, citations: dedupeCitations(r.citations), intent, ...retrievalMeta };
       },
     });
   }
@@ -179,7 +186,7 @@ async function tutorResponse({ question, projectId, chunks, context = {} }) {
         },
       });
       if (g.insufficient || !g.answer) {
-        return { answer: unsupportedMessage(goal), citations: [], grounded: false, intent };
+        return { answer: unsupportedMessage(goal), citations: [], grounded: false, intent, ...retrievalMeta };
       }
       // Map model-returned indices to REAL chunk metadata. Anything out of range
       // is dropped — the model can never invent a filename or page number.
@@ -193,11 +200,12 @@ async function tutorResponse({ question, projectId, chunks, context = {} }) {
       return {
         answer: g.answer, citations: finalCites, grounded: true, intent,
         inputTokens: g.inputTokens, outputTokens: g.outputTokens,
+        ...retrievalMeta,
       };
     },
     fallback: async () => {
       const r = await mockProvider.generateTutorResponse({ question: groundedQuestion, hits, chunks: retrievalResult.chunks, context: richContext });
-      return { ...r, citations: dedupeCitations(r.citations), intent };
+      return { ...r, citations: dedupeCitations(r.citations), intent, ...retrievalMeta };
     },
   });
 }

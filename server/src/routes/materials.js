@@ -9,7 +9,22 @@ const { enqueue, processMaterial } = require('../services/jobs');
 
 const dir = process.env.UPLOAD_DIR || './uploads';
 fs.mkdirSync(dir, { recursive: true });
-const upload = multer({ dest: dir, limits: { fileSize: 25 * 1024 * 1024 }, fileFilter: (req, f, cb) => cb(null, f.originalname.toLowerCase().endsWith('.pdf')) });
+const MAX_FILE_SIZE = 25 * 1024 * 1024;
+const upload = multer({ dest: dir, limits: { fileSize: MAX_FILE_SIZE }, fileFilter: (req, f, cb) => cb(null, f.originalname.toLowerCase().endsWith('.pdf')) });
+
+function uploadErrorHandler(err, req, res, next) {
+  if (!err) return next();
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({ success: false, error: { code: 'file_too_large', message: `File too large. Maximum size is ${MAX_FILE_SIZE / (1024 * 1024)}MB.` } });
+  }
+  if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+    return res.status(400).json({ success: false, error: { code: 'unexpected_file', message: 'Unexpected file field. Use field name "file".' } });
+  }
+  if (err.message === 'PDF file required' || err.message?.includes('PDF')) {
+    return res.status(400).json({ success: false, error: { code: 'invalid_file_type', message: 'Only PDF files are allowed.' } });
+  }
+  return res.status(400).json({ success: false, error: { code: 'upload_failed', message: err.message || 'Upload failed.' } });
+}
 
 const r = express.Router();
 r.use(auth);
@@ -30,7 +45,7 @@ r.get('/single/:id', async (req, res) => {
   if (!m || m.ownerId.toString() !== req.user.id) return res.status(404).json({ success: false, error: { code: 'not_found', message: 'material not found' } });
   res.json(m);
 });
-r.post('/:projectId/materials', projectScope, upload.single('file'), async (req, res) => {
+r.post('/:projectId/materials', projectScope, upload.single('file'), uploadErrorHandler, async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'PDF file required' });
   const key = req.body.idempotencyKey || uuid();
   const dup = await Material.findOne({ projectId: req.project._id, idempotencyKey: key });

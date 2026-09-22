@@ -7,6 +7,7 @@ export default function Home() {
   const [spaces, setSpaces] = useState([]);
   const [global, setGlobal] = useState(null);
   const [name, setName] = useState('');
+  const [activeTab, setActiveTab] = useState('overview');
 
   const load = async () => {
     try {
@@ -20,18 +21,31 @@ export default function Home() {
     const s = await api('/api/spaces', { method: 'POST', body: JSON.stringify({ name, description: '' }) });
     setName(''); setSpaces([...spaces, s]);
   };
+
   return <div>
-    <h2>Where was I, how am I doing, what next?</h2>
-    {global && <div className="card"><b>Continue learning:</b> {global.nextActions?.[0]?.text || 'Create a project and upload a PDF to begin.'}<br />
-      <small>Projects: {global.counts?.projects ?? global.projects} · Spaces: {global.counts?.spaces ?? global.spaces} · Needs attention: {global.needsAttention?.map((w) => `${w.name} (${Math.round(w.mastery * 100)}%)`).join(', ') || 'none'}</small></div>}
-
-    <GlobalAnalytics />
-
-    <div className="card"><h3>Spaces</h3>
-      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="New space name (e.g. Machine Learning)" />
-      <p><button onClick={createSpace}>Create space</button></p>
-      {spaces.map((s) => <SpaceRow key={s._id} s={s} />)}
+    <div className="home-head">
+      <h2>Where was I, how am I doing, what next?</h2>
+      <nav className="home-tabs" aria-label="Home sections">
+        {['overview', 'analytics'].map((t) => (
+          <button key={t} className={activeTab === t ? 'active' : ''} onClick={() => setActiveTab(t)}>
+            {t === 'overview' ? 'Overview' : 'Analytics'}
+          </button>
+        ))}
+      </nav>
     </div>
+
+    {activeTab === 'overview' && <>
+      {global && <div className="card"><b>Continue learning:</b> {global.nextActions?.[0]?.text || 'Create a project and upload a PDF to begin.'}<br />
+        <small>Projects: {global.counts?.projects ?? global.projects} · Spaces: {global.counts?.spaces ?? global.spaces} · Needs attention: {global.needsAttention?.map((w) => `${w.name} (${Math.round(w.mastery * 100)}%)`).join(', ') || 'none'}</small></div>}
+
+      <div className="card"><h3>Spaces</h3>
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="New space name (e.g. Machine Learning)" />
+        <p><button onClick={createSpace}>Create space</button></p>
+        {spaces.map((s) => <SpaceRow key={s._id} s={s} />)}
+      </div>
+    </>}
+
+    {activeTab === 'analytics' && <GlobalAnalytics />}
   </div>;
 }
 

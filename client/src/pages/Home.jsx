@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
+import GlobalAnalytics from '../components/analytics/GlobalAnalytics.jsx';
 
 export default function Home() {
   const [spaces, setSpaces] = useState([]);
-  const [projects, setProjects] = useState([]);
   const [global, setGlobal] = useState(null);
   const [name, setName] = useState('');
 
@@ -23,7 +23,10 @@ export default function Home() {
   return <div>
     <h2>Where was I, how am I doing, what next?</h2>
     {global && <div className="card"><b>Continue learning:</b> {global.nextActions?.[0]?.text || 'Create a project and upload a PDF to begin.'}<br />
-      <small>Projects: {global.projects} · Needs attention: {global.needsAttention?.map((w) => `${w.name} (${Math.round(w.mastery * 100)}%)`).join(', ') || 'none'}</small></div>}
+      <small>Projects: {global.counts?.projects ?? global.projects} · Spaces: {global.counts?.spaces ?? global.spaces} · Needs attention: {global.needsAttention?.map((w) => `${w.name} (${Math.round(w.mastery * 100)}%)`).join(', ') || 'none'}</small></div>}
+
+    <GlobalAnalytics />
+
     <div className="card"><h3>Spaces</h3>
       <input value={name} onChange={(e) => setName(e.target.value)} placeholder="New space name (e.g. Machine Learning)" />
       <p><button onClick={createSpace}>Create space</button></p>

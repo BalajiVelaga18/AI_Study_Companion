@@ -24,12 +24,62 @@ r.get('/project/:projectId', projectScope, async (req, res) => {
 });
 
 r.get('/global', async (req, res) => {
-  const projects = await Project.find({ ownerId: req.user.id });
-  const spaces = await Space.find({ ownerId: req.user.id });
-  const events = await Event.find({ ownerId: req.user.id }).sort({ at: -1 }).limit(100);
-  const recs = await Rec.find({ ownerId: req.user.id }).sort({ createdAt: -1 }).limit(5);
-  const weak = await Concept.find({ ownerId: req.user.id }).sort({ mastery: 1 }).limit(5);
-  res.json({ projects: projects.length, spaces: spaces.length, recentActivity: events, nextActions: recs, needsAttention: weak });
+  const owner = req.user.id;
+  const [projects, spaces, events, recs, weak, quizzes, tutorMsgs, materials, concepts] = await Promise.all([
+    Project.find({ ownerId: owner }),
+    Space.find({ ownerId: owner }),
+    Event.find({ ownerId: owner }).sort({ at: -1 }).limit(100),
+    Rec.find({ ownerId: owner }).sort({ createdAt: -1 }).limit(5),
+    Concept.find({ ownerId: owner }).sort({ mastery: 1 }).limit(10),
+    Quiz.find({ ownerId: owner }).sort({ createdAt: -1 }).limit(50),
+    Message.countDocuments({ ownerId: owner, role: 'assistant' }),
+    Material.find({ ownerId: owner }).sort({ createdAt: -1 }).limit(10),
+    Concept.find({ ownerId: owner }),
+  ]);
+
+  const byDay = {};
+  for (const e of events) {
+    const d = e.at.toISOString().slice(0, 10);
+    byDay[d] = (byDay[d] || 0) + 1;
+  }
+
+  const scoredQuizzes = quizzes.filter((q) => typeof q.score === 'number' && q.completed);
+  const avgScore = scoredQuizzes.length
+    ? Math.round(scoredQuizzes.reduce((s, q) => s + q.score, 0) / scoredQuizzes.length)
+    : null;
+
+  const masteryDistribution = { strong: 0, improving: 0, developing: 0, weak: 0 };
+  for (const c of concepts) {
+    const m = c.mastery || 0;
+    if (m >= 0.8) masteryDistribution.strong += 1;
+    else if (m >= 0.6) masteryDistribution.improving += 1;
+    else if (m >= 0.4) masteryDistribution.developing += 1;
+    else masteryDistribution.weak += 1;
+  }
+
+  res.json({
+    counts: {
+      projects: projects.length,
+      spaces: spaces.length,
+      materials: materials.length,
+      concepts: concepts.length,
+      quizzes: quizzes.length,
+      tutorMessages: tutorMsgs,
+    },
+    quizSummary: {
+      total: quizzes.length,
+      completed: scoredQuizzes.length,
+      avg: avgScore,
+      best: scoredQuizzes.length ? Math.max(...scoredQuizzes.map((q) => q.score)) : null,
+      recent: scoredQuizzes.slice(0, 5).map((q) => ({ score: q.score, at: q.createdAt })),
+    },
+    activityByDay: byDay,
+    recentActivity: events.slice(0, 20),
+    nextActions: recs,
+    needsAttention: weak,
+    masteryDistribution,
+    recentMaterials: materials.map((m) => ({ id: m._id, filename: m.filename, status: m.status, createdAt: m.createdAt })),
+  });
 });
 
 // --- ADMIN (PRD §16) ---
